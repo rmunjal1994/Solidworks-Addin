@@ -34,9 +34,9 @@ using System.Diagnostics.Tracing;
 
 namespace Solidworks_Addin
 {
-    public enum WeldmentCommands_e
+    public enum Commands_e                                                      //Initilise Buttons within solidworks 
     {
-        [Title("Generate Weldment Drawings")] Generate,
+        [Title("Generate Member and Plate Drawings")] Generate,     
 
         [Title("Insert Property Annotation")] InsertAnnotation,
 
@@ -47,58 +47,61 @@ namespace Solidworks_Addin
 
     #region
     [ComVisible(true)]
-    [Guid("A2C5C019-E891-43B3-8670-B0EDFB19D803")]
-    [Title("Weldment Drawing Generator")]
+    [Guid("726b4113-46b3-431b-850c-b2509b38f4e8")]
+    [ProgId("MyCompany.MyAddin")]
+    [Title("RSRG Solidworks Automation")]
     #endregion
 
     public class DrawingAddIn : SwAddInEx
     {
-        public override void OnConnect()
+       
+
+        public override void OnConnect()                            //Initiliase Addin on connect 
         {
             CommandManager
-                .AddCommandGroup<WeldmentCommands_e>()
+                .AddCommandGroup<Commands_e>()
                 .CommandClick += OnCommandClicked;
         }
 
-        private void OnCommandClicked(WeldmentCommands_e cmd)
+        private void OnCommandClicked(Commands_e cmd)
         {
             switch (cmd)
             {
-                case WeldmentCommands_e.Generate:
-                    GenerateWeldmentDrawing();
+                case Commands_e.Generate:
+                    GenerateMemPlaDrawing();
                     break;
 
-                case WeldmentCommands_e.InsertAnnotation:
+                case Commands_e.InsertAnnotation:
                     InsertAnnotation();
                     break;
 
-                case WeldmentCommands_e.ExportPDF:
-                    ExportPDF(@"C:\Users\RohanMunjal\OneDrive - RSRG\Desktop\allPdf.PDF");
+                case Commands_e.ExportPDF:
+                    ExportPDF(); // hardcoded file path for save locataion for PDF File 
                     break;
 
-                case WeldmentCommands_e.ExportDXF:
+                case Commands_e.ExportDXF:
                     ExportDXF();
                     break;
 
             }
         }
        
-        private void GenerateWeldmentDrawing()
+        private void GenerateMemPlaDrawing()
         {
-            var part = Application.Documents.Active as ISwPart;
+            var part = Application.Documents.Active as ISwPart;     // check to see if file open is an active part 
             if (part == null)
             {
                 Application.ShowMessageBox("Active document is not a part.");
                 return;
             }
-            IModelDoc2 swModel = (IModelDoc2)part.Model;
+            IModelDoc2 swModel = (IModelDoc2)part.Model;        
             string partPath = swModel.GetPathName();
 
-            int configIndex = 0;
-            var configs = new System.Collections.Generic.List<string>();
+            int configIndex = 0;                                                    // counter for sheet name number to be used to track number of configs created 
+            var configs = new System.Collections.Generic.List<string>();            //list to save all required configs 
 
             // Iterate each cutlist item
-            foreach (var cutList in part.Configurations.Active.CutLists)
+            foreach (var cutList in part.Configurations.Active.CutLists)            
             {
 
                 var firstBody = cutList.Bodies.FirstOrDefault();
@@ -140,18 +143,18 @@ namespace Solidworks_Addin
                 configs.Add(configName);
             }
 
-            if (configs.Count == 0)
+            if (configs.Count == 0)                                                                    // error check to determine if cutlist selected 
             {
                 Application.ShowMessageBox("No valid cutlists found (all excluded or empty).");
                 return;
             }
 
             // --- Drawing Creation ---
-            string Template = @"C:\ProgramData\SOLIDWORKS\SOLIDWORKS 2025\templates\RSRG A3.DRWDOT";
+            string Template = @"C:\ProgramData\SOLIDWORKS\SOLIDWORKS 2025\templates\RSRG A3.DRWDOT"; // template location for drawing sheet template 
             var swDraw = Application.Sw.INewDocument(Template,
                          (int)swDwgPaperSizes_e.swDwgPaperA3size, 0, 0) as DrawingDoc;
 
-            int sheetNo = 0;
+            int sheetNo = 0;                                                                        // track number of drawing sheet created 
 
             foreach (string cfgName in configs)
             {
@@ -160,7 +163,7 @@ namespace Solidworks_Addin
 
                 if (sheetNo > 1)
                 {
-                    swDraw.NewSheet4(sheetName,
+                    swDraw.NewSheet4(sheetName,                                                    //setup new sheet 
                         (int)swDwgPaperSizes_e.swDwgPaperA3size,
                         (int)swDwgTemplates_e.swDwgTemplateCustom,
                         1.0, 10.0, false, Template, 0, 0, "", 0, 0, 0, 0, 0, 0
@@ -168,7 +171,7 @@ namespace Solidworks_Addin
                 }
                 else
                 {
-                    swDraw.SetupSheet5(sheetName,
+                    swDraw.SetupSheet5(sheetName,                                                  //Setup First Sheet 
                         (int)swDwgPaperSizes_e.swDwgPaperA3size,
                         (int)swDwgTemplates_e.swDwgTemplateCustom,
                         1.0, 10.0, true, Template, 0.42, 0.297, "Default", false);
@@ -177,16 +180,16 @@ namespace Solidworks_Addin
                 ModelDoc2 swDrawModel = (ModelDoc2)swDraw;
 
 
-                View FrontView = swDraw.CreateDrawViewFromModelView3(partPath, "*Front", 0.15, 0.15, 0);
+                View FrontView = swDraw.CreateDrawViewFromModelView3(partPath, "*Front", 0.15, 0.15, 0); // Adds front View(based of global coordinate system) 
                 if (FrontView != null)
                 {
                     FrontView.ReferencedConfiguration = cfgName;
                 }
 
-                View RightView = swDraw.CreateDrawViewFromModelView3(partPath, "*Right", 0.25, 0.15, 0);
+                View RightView = swDraw.CreateDrawViewFromModelView3(partPath, "*Right", 0.25, 0.15, 0);// Adds Right View(based of global coordinate system)
                 if (RightView != null) RightView.ReferencedConfiguration = cfgName;
 
-                View TopView = swDraw.CreateDrawViewFromModelView3(partPath, "*Top", 0.15, 0.25, 0);
+                View TopView = swDraw.CreateDrawViewFromModelView3(partPath, "*Top", 0.15, 0.25, 0);// Adds Top View(based of global coordinate system)
                 if (TopView != null) TopView.ReferencedConfiguration = cfgName;
             }
         }
@@ -195,7 +198,7 @@ namespace Solidworks_Addin
         {
             // Get the active SolidWorks document
             IModelDoc2 swModel = (IModelDoc2)Application.Sw.ActiveDoc;
-            if (swModel == null || swModel.GetType() != (int)swDocumentTypes_e.swDocDRAWING)
+            if (swModel == null || swModel.GetType() != (int)swDocumentTypes_e.swDocDRAWING)  // checks if open file is drawing 
             {
                 Application.ShowMessageBox("Please open a drawing first.");
                 return;
@@ -212,18 +215,16 @@ namespace Solidworks_Addin
 
                 // --- Build the note text using user input ---
                 string GenText =
-                    "NOTES: \n"+
-                    "\n" +
-                    "GENERAL\n" +
-                    "\n" + 
-                    $"   1. QUANTITY SHOWN FOR  {form.QuantityRequired} UNITS\n";
+                    "NOTES: \n" + "\n" +
+                    "GENERAL\n" + "\n" + 
+                    $"   1. QUANTITY SHOWN FOR {form.QuantityRequired} UNITS\n";
 
-                switch (form.ManMethod)
+                switch (form.ManMethod)                 //--For Manufacturing Method--
                 {
                     case "None":
                         break;
-                    case "Fabrication":
-                        GenText += "\n FABRICATION\n" + "\n" +
+                    case "Fabrication":                                                 // reference dropdown option 
+                        GenText += "\n FABRICATION\n" + "\n" +                          // "\n" to create new line 
                                     "   1. DO NOT SCALE DIMENSIONS \n" + 
                                     "   2. ALL DIMENSIONS ARE IN MILIMITERS \n" + 
                                     "   3. ALL EDGES ARE TO BE BROKEN AND FREE OF BURS \n" +
@@ -348,9 +349,9 @@ namespace Solidworks_Addin
             }
         }
 
-        private void ExportPDF(string pdfPath)
+        private void ExportPDF()
         {
-            
+
             // Get active document
             IModelDoc2 swModel = (IModelDoc2)Application.Sw.ActiveDoc;
 
@@ -360,37 +361,53 @@ namespace Solidworks_Addin
                 return;
             }
 
-            // Get extension object
-            ModelDocExtension swExt = swModel.Extension;
-
-            int errors = 0;
-            int warnings = 0;
-
-            // Create ExportPdfData object
-            ExportPdfData pdfData = (ExportPdfData)Application.Sw.GetExportFileData((int)swExportDataFileType_e.swExportPdfData);
-
-            // Configure to export ALL sheets
-            pdfData.ViewPdfAfterSaving = true;  // true = open after saving
-            pdfData.ExportAs3D = false;          // 3D PDF is different
-            pdfData.SetSheets((int)swExportDataSheetsToExport_e.swExportData_ExportAllSheets, null);
-
-            // Save as PDF using ExportPdfData
-            bool status = swExt.SaveAs(
-                pdfPath,
-                (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
-                (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
-                pdfData,
-                ref errors,
-                ref warnings
-            );
-
-            if (status)
+            // --- Show Save File Dialog ---
+            using (SaveFileDialog saveFileDialog = new SaveFileDialog())
             {
-                Application.ShowMessageBox($"All sheets exported to PDF:\n{pdfPath}");
-            }
-            else
-            {
-                Application.ShowMessageBox($"Failed to export PDF. Errors: {errors}, Warnings: {warnings}");
+                saveFileDialog.Title = "Save PDF As";
+                saveFileDialog.Filter = "PDF Files (*.pdf)|*.pdf";
+                saveFileDialog.DefaultExt = "pdf";
+                saveFileDialog.FileName = System.IO.Path.GetFileNameWithoutExtension(swModel.GetTitle()) + ".pdf"; // default name
+
+                if (saveFileDialog.ShowDialog() != DialogResult.OK)
+                {
+                    Application.ShowMessageBox("Export cancelled.");
+                    return;
+                }
+
+                string pdfPath = saveFileDialog.FileName;
+
+                // --- Get extension object ---
+                ModelDocExtension swExt = swModel.Extension;
+                int errors = 0;
+                int warnings = 0;
+
+                // Create ExportPdfData object
+                ExportPdfData pdfData = (ExportPdfData)Application.Sw.GetExportFileData((int)swExportDataFileType_e.swExportPdfData);
+
+                // Export ALL sheets
+                pdfData.ViewPdfAfterSaving = false;
+                pdfData.ExportAs3D = false;
+                pdfData.SetSheets((int)swExportDataSheetsToExport_e.swExportData_ExportAllSheets, null);
+
+                // Save as PDF
+                bool status = swExt.SaveAs(
+                    pdfPath,
+                    (int)swSaveAsVersion_e.swSaveAsCurrentVersion,
+                    (int)swSaveAsOptions_e.swSaveAsOptions_Silent,
+                    pdfData,
+                    ref errors,
+                    ref warnings
+                );
+
+                if (status)
+                {
+                    Application.ShowMessageBox($"All sheets exported to PDF:\n{pdfPath}");
+                }
+                else
+                {
+                    Application.ShowMessageBox($"Failed to export PDF. Errors: {errors}, Warnings: {warnings}");
+                }
             }
         }
 
@@ -399,7 +416,7 @@ namespace Solidworks_Addin
 
         }
 
-        public class UserInputForm : Form
+        public class UserInputForm : Form                               // method to create a form for note generation 
         {
 
             public string QuantityRequired { get; private set; }
@@ -420,6 +437,7 @@ namespace Solidworks_Addin
 
             public UserInputForm()
             {
+                // Initilise Form Parameters 
                 this.Text = "Enter Annotation Details";
                 this.Width = 300;
                 this.Height = 500;
@@ -431,14 +449,14 @@ namespace Solidworks_Addin
                 layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30));
                 layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70));
 
-
-                var lblQuantity = new Label() { Text = "Quantity Required", Left = 10, Top = 10, Width = 260 };
-                txtQuantityRequired = new TextBox { Left = 10, Top = 30, Width = 260 };
+                //Text Box for Quantity Required 
+                var lblQuantity = new Label() { Text = "Quantity Required", Left = 10, Top = 10, Width = 260 };     // Heading for Title 
+                txtQuantityRequired = new TextBox { Left = 10, Top = 30, Width = 260 };                             //{Location within form}
 
                 // --- Dropdown for Type of Manufacturing Process Used ---
                 var lblManMethod = new Label() { Text = "select the type of manufacturing Method Used", Left = 10, Top = 50, Width = 260 };
                 cmbManMethod = new ComboBox { Left = 10, Top = 70, Width = 260 };
-                cmbManMethod.Items.AddRange(new string[] { "None","Fabrication", "Lasercutting", "Machined Component" });
+                cmbManMethod.Items.AddRange(new string[] { "None","Fabrication", "Lasercutting", "Machined Component" }); // List within dropdown 
                 cmbManMethod.DropDownStyle = ComboBoxStyle.DropDownList;
                 cmbManMethod.SelectedIndex = 0; // default selection
 
@@ -470,10 +488,10 @@ namespace Solidworks_Addin
 
 
 
-                btnOk = new Button { Text = "OK", Left = 10, Top = 280, Width = 100 };
-                btnOk.Click += (sender, e) =>
+                btnOk = new Button { Text = "OK", Left = 10, Top = 280, Width = 100 }; 
+                btnOk.Click += (sender, e) =>               // comand for implement when Ok Button is pressed within 
                 {
-                    QuantityRequired = txtQuantityRequired.Text;
+                    QuantityRequired = txtQuantityRequired.Text;                                 
                     ManMethod = cmbManMethod.SelectedItem.ToString();
                     TypeUsed = cmbTypeUsed.SelectedItem.ToString();
                     Weld = txtWeld.Text;
@@ -484,7 +502,7 @@ namespace Solidworks_Addin
                 };
 
 
-                Controls.Add(lblQuantity);
+                Controls.Add(lblQuantity);                          //Add functions within Form 
                 Controls.Add(txtQuantityRequired);
                 Controls.Add(lblManMethod);
                 Controls.Add(cmbManMethod);
@@ -500,6 +518,8 @@ namespace Solidworks_Addin
 
             }
         }
+
+
     }
 }
 
